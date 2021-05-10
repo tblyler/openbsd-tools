@@ -1,5 +1,5 @@
-#!/bin/sh
-set -eu
+#!/usr/local/bin/bash
+set -euo pipefail
 
 readonly DHCPD_CONF_FILE="${DHCPD_CONF_FILE:-/etc/dhcpd.conf}"
 readonly DHCPD_LEASES_FILE="${DHCPD_LEASES_FILE:-/var/db/dhcpd.leases}"

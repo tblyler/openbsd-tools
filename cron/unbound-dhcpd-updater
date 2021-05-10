@@ -1,5 +1,5 @@
-#!/bin/sh
-set -eu
+#!/usr/local/bin/bash
+set -euo pipefail
 
 readonly DHCPD_CONF_FILE='/etc/dhcpd.conf'
 readonly DHCPD_LEASES_FILE='/var/db/dhcpd.leases'
@@ -24,5 +24,6 @@ fi
 ../dhcpd/list_active_assignments | ../unbound/local-data-file-generator > "$UNBOUND_LOCAL_DATA_FILE_TMP"
 
 mv "$UNBOUND_LOCAL_DATA_FILE_TMP" "$UNBOUND_LOCAL_DATA_FILE"
+chmod 644 "$UNBOUND_LOCAL_DATA_FILE"
 
-rcctl restart unbound
+rcctl reload unbound

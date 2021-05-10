@@ -1,0 +1,23 @@
+#!/usr/local/bin/bash
+
+set -euo pipefail
+
+if ! command -v curl &> /dev/null; then
+	>&2 echo 'curl is missing from PATH'
+	exit 1
+fi
+
+readonly OUTPUT_FILE='/var/unbound/etc/blocklist.conf'
+
+curl -LSsf 'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts' | awk '/^0\.0\.0\.0/{
+	# there is no need for a "0.0.0.0 0.0.0.0" line
+	if ($2 == "0.0.0.0") {
+		next
+	}
+
+	print "local-zone: \"" $2 "\" redirect"
+	print "local-data: \"" $2 " A 0.0.0.0\""
+}' > "${OUTPUT_FILE}"
+
+chmod 644 "${OUTPUT_FILE}"
+rcctl reload unbound

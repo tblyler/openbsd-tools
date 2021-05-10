@@ -1,0 +1,95 @@
+#!/bin/sh
+set -eu
+
+readonly DHCPD_CONF_FILE="${DHCPD_CONF_FILE:-/etc/dhcpd.conf}"
+readonly DHCPD_LEASES_FILE="${DHCPD_LEASES_FILE:-/var/db/dhcpd.leases}"
+
+DHCPD_CONF_FILE_AWK_SCRIPT=$(cat << 'EOF'
+/^[ \t]*host[ \t]+[^ \t]+[ \t]+\{[ \t]*$/ {
+	ip = ""
+	hostname = $2
+	next
+}
+
+/^[ \t]*fixed-address[ \t]+([0-9]{1,3}\.){3}[0-9]{1,3}[ \t]*;[ \t]*$/ {
+	ip = substr($2, 1, length($2)-1)
+	next
+}
+
+/\}/ {
+	if (hostname && ip) {
+		print hostname "\t" ip
+	}
+
+	hostname = ""
+	ip = ""
+	next
+}
+EOF
+)
+
+readonly DHCPD_CONF_FILE_AWK_SCRIPT
+
+DHCPD_LEASES_FILE_AWK_SCRIPT=$(cat << 'EOF'
+function parse_datetime(datetime) {
+	command = "date -j -f \"%w %Y/%m/%d %H:%M:%S %Z;\" +%s \"" datetime "\""
+	if (command | getline unix_time < 0) {
+		exit 1
+	}
+
+	close(command)
+
+	return unix_time
+}
+
+/^[ \t]*lease[ \t]+([0-9]{1,3}\.){3}[0-9]{1,3}[ \t]+\{[ \t]*$/ {
+	ip = $2
+	next
+}
+
+/^[ \t]*(starts|ends)[ \t]+[0-6][ \t]+[0-9]+\/[0-9]+\/[0-9]+[ \t]+[0-9]+:[0-9]+:[0-9]+([ \t]+[a-zA-Z0-9]+)?[ \t]*;[ \t]*$/ {
+	if ($1 == "starts") {
+		$1 = ""
+		# remove the leading space caused by setting $1 to ""
+		starts = parse_datetime(substr($0, 2))
+	} else {
+		$1 = ""
+		# remove the leading space caused by setting $1 to ""
+		ends = parse_datetime(substr($0, 2))
+	}
+
+	next
+}
+
+/^[ \t]*(client-)?hostname[ \t]+\"[^\"]+\"[ \t]*;[ \t]*$/ {
+	hostname = gensub("\"|;", "", "g", $2)
+	next
+}
+
+/^[ \t]*abandoned[ \t]*;[ \t]*$/ {
+	abandoned = 1
+	next
+}
+
+/\}/ {
+	now = systime()
+
+	if (!abandoned && hostname && ip && starts && ends && now >= starts && now < ends) {
+		print hostname "\t" ip
+	}
+
+	hostname = ""
+	ip = ""
+	starts = 0
+	ends = 0
+	abandoned = 0
+}
+EOF
+)
+
+readonly DHCPD_LEASES_FILE_AWK_SCRIPT
+
+(
+	awk "${DHCPD_CONF_FILE_AWK_SCRIPT}" "${DHCPD_CONF_FILE}"
+	awk "${DHCPD_LEASES_FILE_AWK_SCRIPT}" "${DHCPD_LEASES_FILE}"
+) | sort -u | column -c 2 -t

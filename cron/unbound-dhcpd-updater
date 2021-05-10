@@ -1,0 +1,28 @@
+#!/bin/sh
+set -eu
+
+readonly DHCPD_CONF_FILE='/etc/dhcpd.conf'
+readonly DHCPD_LEASES_FILE='/var/db/dhcpd.leases'
+readonly UNBOUND_LOCAL_DATA_FILE='/var/unbound/etc/local-data-dhcpd.conf'
+UNBOUND_LOCAL_DATA_FILE_TMP="$(mktemp)"
+readonly UNBOUND_LOCAL_DATA_FILE_TMP
+
+get_file_modify_time() {
+	stat -f %m "$1"
+}
+
+if [ -e "$UNBOUND_LOCAL_DATA_FILE" ]; then
+	UNBOUND_LOCAL_DATA_FILE_MODIFY_TIME="$(get_file_modify_time "$UNBOUND_LOCAL_DATA_FILE")"
+
+	if [ "$UNBOUND_LOCAL_DATA_FILE_MODIFY_TIME" -gt "$(get_file_modify_time "$DHCPD_CONF_FILE")" ]; then
+		if [ "$UNBOUND_LOCAL_DATA_FILE_MODIFY_TIME" -gt "$(get_file_modify_time "$DHCPD_LEASES_FILE")" ]; then
+			exit 0
+		fi
+	fi
+fi
+
+../dhcpd/list_active_assignments | ../unbound/local-data-file-generator > "$UNBOUND_LOCAL_DATA_FILE_TMP"
+
+mv "$UNBOUND_LOCAL_DATA_FILE_TMP" "$UNBOUND_LOCAL_DATA_FILE"
+
+rcctl reload unbound

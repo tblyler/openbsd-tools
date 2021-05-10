@@ -1,0 +1,15 @@
+#!/bin/sh
+
+set -eu
+
+AWK_SCRIPT=$(cat << 'EOF'
+/^[ \t]*[^ \t]+[ \t]+([0-9]{1,3}\.){3}[0-9]{1,3}[ \t]*$/ {
+	print "local-data: \"" $1 " A " $2 "\""
+	print "local-data-ptr: \"" $2 " " $1 "\""
+}
+EOF
+)
+
+readonly AWK_SCRIPT
+
+awk "$AWK_SCRIPT"

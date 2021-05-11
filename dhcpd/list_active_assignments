@@ -32,7 +32,7 @@ readonly DHCPD_CONF_FILE_AWK_SCRIPT
 
 DHCPD_LEASES_FILE_AWK_SCRIPT=$(cat << 'EOF'
 function parse_datetime(datetime) {
-	command = "date -j -f \"%w %Y/%m/%d %H:%M:%S %Z;\" +%s \"" datetime "\""
+	command = "TZ=UTC date -j -f \"%w %Y/%m/%d %H:%M:%S %Z;\" +%s \"" datetime "\""
 	if (command | getline unix_time < 0) {
 		exit 1
 	}
